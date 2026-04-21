@@ -1,55 +1,45 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabaseClient";
+import { useRouter } from "next/navigation";
 import RoadmapGraph from "@/components/RoadmapGraph";
 
+type Step = {
+  id: string;
+  step: string;
+  type: string;
+  domain: string;
+  platform: string;
+  status: string;
+  difficulty?: string;
+};
+
+type RoadmapGroup = {
+  goal: { id: string; goal_text: string };
+  sessionId: string | null;
+  roadmap: Step[];
+};
+
 export default function RoadmapPage() {
-  const [steps, setSteps] = useState<any[]>([]);
+  const router = useRouter();
+  const [groups, setGroups] = useState<RoadmapGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState<Partial<Step>>({});
 
-  // 📊 FETCH LATEST ROADMAP
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchAllRoadmaps = async () => {
       setLoading(true);
-
-      try {
-        const { data: sessions } = await supabase
-          .from("roadmap_sessions")
-          .select("*")
-          .order("created_at", { ascending: false })
-          .limit(1);
-
-        if (!sessions || sessions.length === 0) {
-          setSteps([]);
-          setLoading(false);
-          return;
-        }
-
-        const latestSessionId = sessions[0].id;
-
-        const { data: roadmap } = await supabase
-          .from("roadmap")
-          .select("*")
-          .eq("session_id", latestSessionId)
-          .order("order_index");
-
-        setSteps(roadmap || []);
-      } catch (err) {
-        console.error("Fetch error:", err);
-        setSteps([]);
-      }
-
+      const res = await fetch("/api/roadmap/all", { cache: "no-store" });
+      const payload = await res.json();
+      setGroups(payload.groups || []);
       setLoading(false);
     };
-
-    fetchData();
+    fetchAllRoadmaps();
   }, []);
 
-  // 🔥 STEP CLICK HANDLER
-  const handleStepClick = async (step: any) => {
-    // prevent spam clicking
+  const handleStepClick = async (step: Step) => {
     if (activeId === step.id) return;
 
     setActiveId(step.id);
@@ -71,29 +61,33 @@ export default function RoadmapPage() {
 
       console.log("API RESPONSE:", data);
 
-      if (!data.link) {
-        alert("No resource found");
+      // Keep users in-app: do not open external tabs from roadmap clicks.
+
+      const startRes = await fetch("/api/roadmap/start-step", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ stepId: step.id }),
+      });
+      const startPayload = await startRes.json();
+      if (!startRes.ok || !startPayload.taskId) {
+        alert(startPayload.message || "Could not open learning session");
         setActiveId(null);
         return;
       }
 
-      // 🎯 OPEN LINK
-      window.open(data.link, "_blank");
+      await fetch("/api/roadmap/complete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ stepId: step.id }),
+      });
 
-      // ✅ UPDATE DB
-      await supabase
-        .from("roadmap")
-        .update({ status: "completed" })
-        .eq("id", step.id);
-
-      // ⚡ INSTANT UI UPDATE
-      setSteps((prev) =>
-        prev.map((s) =>
-          s.id === step.id
-            ? { ...s, status: "completed" }
-            : s
-        )
+      setGroups((prev) =>
+        prev.map((group) => ({
+          ...group,
+          roadmap: group.roadmap.map((s) => (s.id === step.id ? { ...s, status: "completed" } : s)),
+        }))
       );
+      router.push(`/learn/${startPayload.taskId}`);
     } catch (err) {
       console.error("Click error:", err);
       alert("Something went wrong");
@@ -102,29 +96,111 @@ export default function RoadmapPage() {
     setActiveId(null);
   };
 
+  const startEdit = (step: Step) => {
+    setEditingId(step.id);
+    setEditDraft(step);
+  };
+
+  const saveEdit = async (stepId: string) => {
+    const res = await fetch("/api/roadmap/update-step", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        stepId,
+        step: editDraft.step,
+        type: editDraft.type,
+        domain: editDraft.domain,
+        platform: editDraft.platform,
+      }),
+    });
+    const payload = await res.json();
+    if (!res.ok || !payload.step) {
+      alert(payload.message || "Could not update step");
+      return;
+    }
+    setGroups((prev) =>
+      prev.map((group) => ({
+        ...group,
+        roadmap: group.roadmap.map((s) => (s.id === stepId ? payload.step : s)),
+      }))
+    );
+    setEditingId(null);
+    setEditDraft({});
+  };
+
   return (
-    <main className="min-h-screen bg-black text-white p-10">
-      <h1 className="text-3xl font-bold mb-8">
-        Your AI Roadmap 🚀
-      </h1>
+    <main className="min-h-screen bg-black text-white p-6 md:p-10">
+      <h1 className="text-3xl font-bold mb-4">All Goal Roadmaps</h1>
+      <p className="text-zinc-400 mb-6">Showing every roadmap for all your goals automatically.</p>
 
-      {/* 🔄 LOADING */}
       {loading && <p className="text-gray-400">Loading roadmap...</p>}
-
-      {/* ❌ EMPTY */}
-      {!loading && steps.length === 0 && (
-        <p className="text-gray-500">
-          No roadmap found. Complete onboarding first.
-        </p>
+      {!loading && groups.length === 0 && (
+        <p className="text-gray-500">No roadmaps found. Add goals in onboarding and generate plans.</p>
       )}
 
-      {/* 🔥 GRAPH */}
-      {!loading && steps.length > 0 && (
-        <RoadmapGraph
-          steps={steps}
-          onStepClick={handleStepClick}
-        />
-      )}
+      {!loading &&
+        groups.map((group) => (
+          <section key={group.goal.id} className="mb-10">
+            <div className="mb-3">
+              <h2 className="text-xl font-semibold">{group.goal.goal_text}</h2>
+              <p className="text-sm text-zinc-500">Goal ID: {group.goal.id}</p>
+            </div>
+            {group.roadmap.length === 0 ? (
+              <p className="text-zinc-500">No roadmap generated for this goal yet.</p>
+            ) : (
+              <>
+                <RoadmapGraph steps={group.roadmap} onStepClick={handleStepClick} />
+                <div className="mt-6 grid gap-3">
+                  {group.roadmap.map((step) => (
+                    <div key={step.id} className="card">
+                      {editingId === step.id ? (
+                        <div className="grid md:grid-cols-4 gap-2">
+                          <input
+                            className="field-input md:col-span-2"
+                            value={editDraft.step || ""}
+                            onChange={(e) => setEditDraft((prev) => ({ ...prev, step: e.target.value }))}
+                          />
+                          <input
+                            className="field-input"
+                            value={editDraft.type || ""}
+                            onChange={(e) => setEditDraft((prev) => ({ ...prev, type: e.target.value }))}
+                          />
+                          <input
+                            className="field-input"
+                            value={editDraft.platform || ""}
+                            onChange={(e) => setEditDraft((prev) => ({ ...prev, platform: e.target.value }))}
+                          />
+                          <input
+                            className="field-input md:col-span-2"
+                            value={editDraft.domain || ""}
+                            onChange={(e) => setEditDraft((prev) => ({ ...prev, domain: e.target.value }))}
+                          />
+                          <div className="flex gap-2">
+                            <button className="btn-primary" onClick={() => saveEdit(step.id)}>Save</button>
+                            <button className="btn-ghost" onClick={() => setEditingId(null)}>Cancel</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="font-semibold">{step.step}</p>
+                            <p className="text-sm text-zinc-400">
+                              {step.type} • {step.domain} • {step.platform} • {step.status}
+                            </p>
+                          </div>
+                          <div className="flex gap-2">
+                            <button className="btn-ghost" onClick={() => startEdit(step)}>Edit</button>
+                            <button className="btn-primary" onClick={() => handleStepClick(step)}>Open</button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </section>
+        ))}
     </main>
   );
 }

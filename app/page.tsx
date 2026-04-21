@@ -22,8 +22,8 @@ export default function Home() {
           </h1>
 
           <p className="text-base text-zinc-400 max-w-md mb-8 leading-relaxed">
-            Your AI-powered career guide that builds personalized roadmaps,
-            tracks your progress, and helps you grow step by step.
+            Your Learning OS for university students. Set one goal and Saarthi
+            generates your roadmap, daily tasks, adaptive revision, and mastery tracking.
           </p>
 
           <div className="flex flex-wrap gap-3 mb-8">
@@ -31,19 +31,25 @@ export default function Home() {
               onClick={() => (window.location.href = "/onboarding")}
               className="btn-primary"
             >
-              Get Started <ArrowRight size={16} />
+              Start Learning OS <ArrowRight size={16} />
             </button>
             <button
-              onClick={() => (window.location.href = "/about")}
+              onClick={() => (window.location.href = "/today")}
               className="btn-ghost"
             >
-              See how it works
+              Open Today Plan
+            </button>
+            <button
+              onClick={() => (window.location.href = "/progress")}
+              className="btn-ghost"
+            >
+              View Progress
             </button>
           </div>
 
           {/* Feature pills */}
           <div className="flex flex-wrap gap-2">
-            {["AI Roadmaps", "Progress Tracking", "Resource Links"].map((f) => (
+            {["Roadmap", "Daily Tasks", "Auto Notes", "Mastery Score"].map((f) => (
               <span key={f} className="badge">{f}</span>
             ))}
           </div>

@@ -1,96 +1,81 @@
 import { NextResponse } from "next/server";
+import { generateAIText } from "@/lib/ai-provider";
+import { getAuthenticatedUserId } from "@/lib/auth-user";
+import { supabaseServer } from "@/lib/supabaseServer";
+import { buildRoadmapPrompt, fallbackRoadmap, parseRoadmap, StudentProfileInput } from "@/lib/learning-os";
+
+type AssistantDecision = {
+  reply: string;
+  action: "none" | "create_goal" | "generate_roadmap" | "generate_today_tasks" | "show_progress";
+  params?: {
+    goalText?: string;
+  };
+};
 
 export async function POST(req: Request) {
   try {
-    const { input } = await req.json();
-    const lower = (input || "").toLowerCase();
+    const { input, provider = "openai", model } = await req.json();
+    const userId = await getAuthenticatedUserId();
+    if (!userId) {
+      return NextResponse.json({ explanation: "Please sign in first to use Saarthi assistant." }, { status: 401 });
+    }
 
-    // 🧠 Intent detection
-    const isGreeting =
-      lower === "hi" || lower === "hello" || lower === "hey";
+    const userMessage = String(input || "").trim();
+    if (!userMessage) {
+      return NextResponse.json({ explanation: "Tell me what you want to do." });
+    }
 
-    const isDSA =
-      lower.includes("two sum") ||
-      lower.includes("three sum") ||
-      lower.includes("binary search") ||
-      lower.includes("palindrome") ||
-      lower.includes("sliding window");
+    const plannerPrompt = `You are Saarthi AI action planner.
+User message: "${userMessage}"
 
-    // 🧠 Explanation
-    let explanation = "";
+Return ONLY valid JSON:
+{
+  "reply": "short helpful response",
+  "action": "none | create_goal | generate_roadmap | generate_today_tasks | show_progress",
+  "params": {
+    "goalText": "only when relevant"
+  }
+}
 
-    if (isGreeting) {
-      explanation = "Hey 👋 What do you want to learn today?";
-    } else {
-      try {
-        const res = await fetch(
-          "https://openrouter.ai/api/v1/chat/completions",
-          {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              model: "openai/gpt-4o-mini",
-              messages: [
-                {
-                  role: "user",
-                  content: `
-You are Saarthi AI.
+Rules:
+- Pick create_goal when user asks to add a new goal.
+- Pick generate_roadmap when user asks to create plan/roadmap for a specific goal.
+- Pick generate_today_tasks when user asks for today tasks.
+- Pick show_progress when user asks progress/mastery.
+- If unclear, action=none.
+- Keep reply concise.`;
 
-Explain "${input}" clearly:
-- no repetition
-- beginner friendly
-- include intuition
-- keep it engaging
-                  `,
-                },
-              ],
-            }),
-          }
-        );
+    let decision: AssistantDecision = {
+      reply: "I can help create goals, roadmaps, tasks, and progress updates.",
+      action: "none",
+    };
 
-        const data = await res.json();
-        explanation =
-          data.choices?.[0]?.message?.content ||
-          `Explanation of ${input}`;
-      } catch {
-        explanation = `Explanation of ${input}`;
+    try {
+      const decisionText = await generateAIText({
+        provider,
+        prompt: plannerPrompt,
+        openAIModel: model,
+        geminiModel: model,
+      });
+      const parsed = JSON.parse(decisionText) as AssistantDecision;
+      if (parsed?.reply && parsed?.action) {
+        decision = parsed;
       }
+    } catch {
+      // keep fallback decision
     }
 
-    // 🎥 YouTube (ONLY if not greeting)
-    let videos: any[] = [];
-
-    if (!isGreeting) {
-      try {
-        const ytRes = await fetch(
-          `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(
-            input + " tutorial"
-          )}&type=video&maxResults=3&key=${process.env.YOUTUBE_API_KEY}`
-        );
-
-        const ytData = await ytRes.json();
-
-        videos =
-          ytData.items?.map((item: any) => ({
-            title: item.snippet.title,
-            thumbnail: item.snippet.thumbnails.medium.url,
-            videoId: item.id.videoId,
-          })) || [];
-      } catch {}
-    }
-
-    // 🔥 Visualizer steps
-    const steps = isDSA ? getSteps(lower) : [];
+    const result = await executeAction(userId, decision, provider, model);
+    const explanation = result.message ? `${decision.reply}\n\n${result.message}` : decision.reply;
 
     return NextResponse.json({
-      intent: isDSA ? "leetcode" : isGreeting ? "general" : "learn",
-      topic: input,
+      intent: "assistant",
+      topic: userMessage,
       explanation,
-      videos,
-      steps,
+      action: decision.action,
+      actionResult: result.data,
+      videos: [],
+      steps: [],
     });
   } catch (err) {
     console.error(err);
@@ -104,55 +89,151 @@ Explain "${input}" clearly:
   }
 }
 
-// 🔥 Basic visualizer logic
-function getSteps(input: string) {
-  if (input.includes("two sum")) {
-    return [
-      {
-        array: [2, 7, 11, 15],
-        left: 0,
-        right: 1,
-        description: "Checking 2 + 7",
-      },
-      {
-        array: [2, 7, 11, 15],
-        highlight: [0, 1],
-        description: "Found pair",
-      },
-    ];
-  }
+async function executeAction(
+  userId: string,
+  decision: AssistantDecision,
+  provider: string,
+  model?: string
+): Promise<{ message: string; data?: unknown }> {
+  switch (decision.action) {
+    case "create_goal": {
+      const goalText = (decision.params?.goalText || "").trim();
+      if (!goalText) {
+        return { message: "I need a clear goal text to create it." };
+      }
+      const { data, error } = await supabaseServer
+        .from("goals")
+        .insert([{ user_id: userId, goal_text: goalText }])
+        .select()
+        .single();
+      if (error || !data) {
+        return { message: `Could not create goal: ${error?.message || "unknown error"}` };
+      }
+      return { message: `Goal created: "${data.goal_text}"`, data };
+    }
+    case "generate_roadmap": {
+      const goalText = (decision.params?.goalText || "").trim();
+      if (!goalText) {
+        return { message: "Please specify which goal I should build a roadmap for." };
+      }
+      const { data: goalRow, error: goalError } = await supabaseServer
+        .from("goals")
+        .insert([{ user_id: userId, goal_text: goalText }])
+        .select()
+        .single();
+      if (goalError || !goalRow) {
+        return { message: `Could not create goal for roadmap: ${goalError?.message || "unknown error"}` };
+      }
 
-  if (input.includes("binary")) {
-    return [
-      {
-        array: [1, 3, 5, 7, 9],
-        left: 0,
-        right: 4,
-        mid: 2,
-        description: "Checking middle",
-      },
-      {
-        array: [1, 3, 5, 7, 9],
-        highlight: [2],
-        description: "Found target",
-      },
-    ];
-  }
+      const { data: profile } = await supabaseServer
+        .from("profiles")
+        .select("level,interest,time_commitment")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
-  if (input.includes("palindrome")) {
-    return [
-      {
-        array: ["r", "a", "c", "e", "c", "a", "r"],
-        left: 0,
-        right: 6,
-        description: "Compare ends",
-      },
-      {
-        array: ["r", "a", "c", "e", "c", "a", "r"],
-        description: "Palindrome confirmed",
-      },
-    ];
-  }
+      const dailyMinutes = parseDailyMinutes(profile?.time_commitment || "");
+      const student: StudentProfileInput = {
+        userId,
+        goal: goalText,
+        interest: profile?.interest || "General",
+        currentLevel: (profile?.level as "beginner" | "intermediate" | "advanced") || "beginner",
+        semesterWeeks: 16,
+        dailyMinutes,
+      };
 
-  return [];
+      const prompt = buildRoadmapPrompt(student);
+      let roadmap = fallbackRoadmap(student);
+      try {
+        const text = await generateAIText({
+          provider: provider === "gemini" ? "gemini" : "openai",
+          prompt,
+          openAIModel: model,
+          geminiModel: model,
+        });
+        const parsed = parseRoadmap(text);
+        if (parsed.length > 0) roadmap = parsed;
+      } catch {
+        // fallback stays
+      }
+
+      const { data: session, error: sessionError } = await supabaseServer
+        .from("roadmap_sessions")
+        .insert([{ user_id: userId, level: student.currentLevel, goal_id: goalRow.id }])
+        .select()
+        .single();
+      if (sessionError || !session) {
+        return { message: `Could not create roadmap session: ${sessionError?.message || "unknown error"}` };
+      }
+
+      const rows = roadmap.map((step, index) => ({
+        step: step.step,
+        type: step.type,
+        domain: step.domain,
+        platform: step.platform,
+        difficulty: student.currentLevel,
+        status: "not_started",
+        order_index: index,
+        session_id: session.id,
+      }));
+      await supabaseServer.from("roadmap").insert(rows);
+      return { message: `Roadmap generated for "${goalText}" with ${rows.length} steps.`, data: { goalId: goalRow.id } };
+    }
+    case "generate_today_tasks": {
+      const today = new Date().toISOString().slice(0, 10);
+      const { data: sessions } = await supabaseServer
+        .from("roadmap_sessions")
+        .select("id")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(1);
+      const sessionId = sessions?.[0]?.id;
+      if (!sessionId) return { message: "No roadmap found yet. Ask me to generate a roadmap first." };
+      const { data: steps } = await supabaseServer
+        .from("roadmap")
+        .select("id,step,type")
+        .eq("session_id", sessionId)
+        .order("order_index")
+        .limit(5);
+      if (!steps || steps.length === 0) return { message: "Roadmap has no steps yet." };
+      const rows = steps.map((s, i) => ({
+        user_id: userId,
+        roadmap_step_id: s.id,
+        topic: s.step,
+        task_type: s.type === "practice" || s.type === "revise" ? s.type : "learn",
+        status: "pending",
+        priority_score: Number((0.9 - i * 0.1).toFixed(2)),
+        estimated_minutes: 35,
+        due_date: today,
+      }));
+      await supabaseServer.from("learning_tasks").insert(rows);
+      return { message: `Generated ${rows.length} tasks for today.`, data: { count: rows.length } };
+    }
+    case "show_progress": {
+      const { data } = await supabaseServer
+        .from("topic_mastery")
+        .select("topic,mastery_score")
+        .eq("user_id", userId)
+        .order("updated_at", { ascending: false })
+        .limit(5);
+      if (!data || data.length === 0) {
+        return { message: "No progress data yet. Complete a learning task first." };
+      }
+      const summary = data.map((item) => `${item.topic}: ${item.mastery_score}`).join(" | ");
+      return { message: `Recent mastery -> ${summary}`, data };
+    }
+    default:
+      return { message: "" };
+  }
+}
+
+function parseDailyMinutes(timeCommitment: string): number {
+  const match = timeCommitment.match(/\d+/);
+  if (!match) return 90;
+  const first = Number(match[0]);
+  if (!Number.isFinite(first)) return 90;
+  if (timeCommitment.includes("hour")) {
+    return first * 60;
+  }
+  return first;
 }

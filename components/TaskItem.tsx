@@ -2,7 +2,13 @@
 
 import { useState } from "react";
 
-export default function TaskItem({ task }: any) {
+type Task = {
+  id: string;
+  task_text: string;
+  status: string;
+};
+
+export default function TaskItem({ task }: { task: Task }) {
   const [status, setStatus] = useState(task.status);
 
   const toggleStatus = async () => {

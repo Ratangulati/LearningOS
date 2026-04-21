@@ -3,6 +3,7 @@
 import { signIn, useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
+import Image from "next/image";
 
 export default function LoginPage() {
   const { status } = useSession();
@@ -13,7 +14,7 @@ export default function LoginPage() {
     if (status === "authenticated") {
       router.push("/");
     }
-  }, [status]);
+  }, [status, router]);
 
   // ⏳ Prevent flicker
   if (status === "loading") return null;
@@ -40,11 +41,12 @@ export default function LoginPage() {
         {/* 🔐 Google Login */}
         <button
           onClick={() => signIn("google", { callbackUrl: "/" })}
+          disabled={status === "loading"}
           className="mt-8 w-full flex items-center justify-center gap-3 
           bg-white text-black py-3 rounded-xl font-medium 
-          hover:scale-105 transition duration-300 shadow-lg"
+          hover:scale-105 transition duration-300 shadow-lg disabled:opacity-60"
         >
-          <img src="/google.png" className="w-5 h-5" />
+          <Image src="/google.png" alt="Google logo" width={20} height={20} />
           Continue with Google
         </button>
 

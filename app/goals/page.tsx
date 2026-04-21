@@ -1,19 +1,34 @@
-import { supabase } from "@/lib/supabaseClient";
+"use client";
+
+import { useEffect, useState } from "react";
 import GoalForm from "@/components/GoalForm";
 import TaskItem from "@/components/TaskItem";
 
-export const dynamic = "force-dynamic";
+type Task = {
+  id: string;
+  task_text: string;
+  status: string;
+};
+type Goal = {
+  id: string;
+  goal_text: string;
+  deadline: string | null;
+  tasks: Task[];
+};
 
-// 🔥 rename function (important for clarity)
-export default async function GoalsPage() {
-  const { data, error } = await supabase
-    .from("goals")
-    .select("*, tasks(*)")
-    .order("created_at", { ascending: false });
+export default function GoalsPage() {
+  const [data, setData] = useState<Goal[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  if (error) {
-    console.error("Error fetching data:", error);
-  }
+  useEffect(() => {
+    const run = async () => {
+      const res = await fetch("/api/goals", { cache: "no-store" });
+      const payload = await res.json();
+      setData(payload.goals || []);
+      setLoading(false);
+    };
+    run();
+  }, []);
 
   return (
     <main className="min-h-screen bg-black text-white p-10">
@@ -27,9 +42,10 @@ export default async function GoalsPage() {
 
       <h2 className="text-2xl mb-4">Your Goals:</h2>
 
+      {loading && <p>Loading goals...</p>}
       {data?.length === 0 && <p>No goals yet</p>}
 
-      {data?.map((goal: any) => (
+      {data?.map((goal) => (
         <div
           key={goal.id}
           className="bg-gray-800 p-4 rounded mb-4"
@@ -46,7 +62,7 @@ export default async function GoalsPage() {
           {/* Tasks */}
           {goal.tasks?.length > 0 && (
             <ul className="mt-2">
-              {goal.tasks.map((task: any) => (
+              {goal.tasks.map((task) => (
                 <TaskItem key={task.id} task={task} />
               ))}
             </ul>

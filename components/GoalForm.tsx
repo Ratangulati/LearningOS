@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { supabase } from "@/lib/supabaseClient";
+
+type GeneratedTask = { task: string; status?: string };
 
 export default function GoalForm() {
   const [goal, setGoal] = useState("");
@@ -16,23 +17,23 @@ export default function GoalForm() {
     setLoading(true);
 
     try {
-      // 🔹 1. Insert goal
-      const { data: goalData, error } = await supabase
-        .from("goals")
-        .insert([
-          {
-            goal_text: goal,
-            deadline: deadline || null,
-          },
-        ])
-        .select()
-        .single();
-
-      if (error || !goalData) {
-        alert(error?.message || "Failed to insert goal");
+      const goalRes = await fetch("/api/goals", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          goalText: goal,
+          deadline: deadline || null,
+        }),
+      });
+      const goalPayload = await goalRes.json();
+      if (!goalRes.ok || !goalPayload.goal) {
+        alert(goalPayload?.message || "Failed to insert goal");
         setLoading(false);
         return;
       }
+      const goalData = goalPayload.goal;
 
       // 🔹 2. Call AI API
       const res = await fetch("/api/generate-tasks", {
@@ -43,7 +44,7 @@ export default function GoalForm() {
         body: JSON.stringify({ goal }),
       });
 
-      let tasks: any[] = [];
+      let tasks: GeneratedTask[] = [];
 
       try {
         const data = await res.json();
@@ -54,7 +55,7 @@ export default function GoalForm() {
 
       // 🔥 3. CLEAN + STRUCTURED TASK PARSING
       const taskRows = tasks
-        .map((t: any, i: number) => {
+        .map((t, i: number) => {
           let cleanText = "";
 
           // ✅ Case 1: string
@@ -100,12 +101,19 @@ export default function GoalForm() {
 
       // 🔹 4. Insert tasks
       if (taskRows.length > 0) {
-        const { error: taskError } = await supabase
-          .from("tasks")
-          .insert(taskRows);
-
-        if (taskError) {
-          console.error("Task insert error:", taskError);
+        const taskRes = await fetch("/api/goals/tasks", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            goalId: goalData.id,
+            tasks: taskRows.map((row) => ({ task: row.task_text, status: row.status })),
+          }),
+        });
+        if (!taskRes.ok) {
+          const payload = await taskRes.json();
+          console.error("Task insert error:", payload?.message || "Unknown error");
         }
       }
 

@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import Visualizer from "@/components/Visualizer";
+import Link from "next/link";
 
 export default function LearningPage() {
   const [input, setInput] = useState("");
@@ -112,7 +113,11 @@ export default function LearningPage() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ input }),
+        body: JSON.stringify({
+          input,
+          provider: localStorage.getItem("ai_provider") || "openai",
+          model: localStorage.getItem("ai_model") || "gpt-4o-mini",
+        }),
       });
 
       const data = await res.json();
@@ -123,6 +128,8 @@ export default function LearningPage() {
         topic: data.topic,
         videos: data.videos,
         steps: data.steps,
+        action: data.action,
+        actionResult: data.actionResult,
       };
 
       setMessages((prev) => [...prev, botMsg]);
@@ -239,6 +246,29 @@ export default function LearningPage() {
               {/* 🔥 VISUALIZER */}
               {msg.steps?.length > 0 && (
                 <Visualizer steps={msg.steps} />
+              )}
+
+              {msg.action && msg.action !== "none" && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <span className="text-xs px-2 py-1 rounded bg-indigo-900/60 border border-indigo-700">
+                    Action: {msg.action}
+                  </span>
+                  {msg.action === "generate_roadmap" && (
+                    <Link href="/roadmap" className="text-xs px-2 py-1 rounded bg-emerald-700 hover:bg-emerald-600">
+                      Open Roadmap
+                    </Link>
+                  )}
+                  {msg.action === "generate_today_tasks" && (
+                    <Link href="/today" className="text-xs px-2 py-1 rounded bg-emerald-700 hover:bg-emerald-600">
+                      Open Today
+                    </Link>
+                  )}
+                  {msg.action === "show_progress" && (
+                    <Link href="/progress" className="text-xs px-2 py-1 rounded bg-emerald-700 hover:bg-emerald-600">
+                      Open Progress
+                    </Link>
+                  )}
+                </div>
               )}
             </div>
           </div>
