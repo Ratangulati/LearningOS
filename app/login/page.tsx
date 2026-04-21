@@ -8,6 +8,7 @@ import Image from "next/image";
 export default function LoginPage() {
   const { status } = useSession();
   const router = useRouter();
+  const isLoading = status === "loading";
 
   // 🔁 Redirect if already logged in
   useEffect(() => {
@@ -17,7 +18,7 @@ export default function LoginPage() {
   }, [status, router]);
 
   // ⏳ Prevent flicker
-  if (status === "loading") return null;
+  if (isLoading) return null;
 
   return (
     <div className="min-h-screen bg-black flex items-center justify-center relative overflow-hidden">
@@ -41,7 +42,7 @@ export default function LoginPage() {
         {/* 🔐 Google Login */}
         <button
           onClick={() => signIn("google", { callbackUrl: "/" })}
-          disabled={status === "loading"}
+          disabled={isLoading}
           className="mt-8 w-full flex items-center justify-center gap-3 
           bg-white text-black py-3 rounded-xl font-medium 
           hover:scale-105 transition duration-300 shadow-lg disabled:opacity-60"

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-type GeneratedTask = { task: string; status?: string };
+type GeneratedTask = string | { task: string; status?: string };
 
 export default function GoalForm() {
   const [goal, setGoal] = useState("");
