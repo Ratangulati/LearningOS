@@ -3,9 +3,11 @@
 import { ArrowRight } from "lucide-react";
 import SplineRobot from "@/components/SplineRobot";
 import { useSession, signIn } from "next-auth/react";
+import { useRouter } from "next/navigation";
 
 export default function Home() {
-  const { data: session, status } = useSession();
+  const { status } = useSession();
+  const router = useRouter();
 
   return (
     <main className="relative min-h-screen bg-[#0a0a0a] text-white overflow-hidden">
@@ -31,19 +33,19 @@ export default function Home() {
             ) : status === "authenticated" ? (
               <>
                 <button
-                  onClick={() => (window.location.href = "/onboarding")}
+                  onClick={() => router.push("/onboarding")}
                   className="btn-primary"
                 >
                   Start Learning OS <ArrowRight size={16} />
                 </button>
                 <button
-                  onClick={() => (window.location.href = "/today")}
+                  onClick={() => router.push("/today")}
                   className="btn-ghost"
                 >
                   Open Today Plan
                 </button>
                 <button
-                  onClick={() => (window.location.href = "/progress")}
+                  onClick={() => router.push("/progress")}
                   className="btn-ghost"
                 >
                   View Progress
