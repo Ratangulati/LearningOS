@@ -1,13 +1,32 @@
-export { default } from "next-auth/middleware";
+import { getToken } from "next-auth/jwt";
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+
+export async function middleware(request: NextRequest) {
+  const token = await getToken({
+    req: request,
+    secret: process.env.NEXTAUTH_SECRET,
+  });
+
+  if (!token) {
+    const loginUrl = new URL("/login", request.url);
+    loginUrl.searchParams.set("callbackUrl", request.nextUrl.pathname);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  return NextResponse.next();
+}
 
 export const config = {
   matcher: [
-    "/goals",
-    "/roadmap",
-    "/learning",
-    "/upskill",
-    "/calendar",
-    "/credentials",
-    "/about"
+    "/onboarding/:path*",
+    "/roadmap/:path*",
+    "/today/:path*",
+    "/progress/:path*",
+    "/learning/:path*",
+    "/goals/:path*",
+    "/upskill/:path*",
+    "/calendar/:path*",
+    "/credentials/:path*",
   ],
 };
