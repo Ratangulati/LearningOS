@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import SkillCard from "@/components/SkillCard";
+import PageLoader from "@/components/PageLoader";
 
 type Skill = {
   title: string;
@@ -52,9 +53,7 @@ export default function UpskillPage() {
       {/* 🔥 GRID */}
       <div className="relative z-10 px-6 pb-10">
         {loading ? (
-          <div className="flex justify-center items-center h-[50vh] text-gray-400">
-            Loading skills...
-          </div>
+          <PageLoader title="Loading skills" subtitle="Finding top skills for your growth..." />
         ) : (
           <div className="grid gap-6 
             grid-cols-1 

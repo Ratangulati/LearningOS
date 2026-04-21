@@ -82,6 +82,17 @@ export default function LearnTaskPage() {
   );
 
   const handleSubmit = async () => {
+    if (quiz.length === 0) {
+      setError("Quiz is not loaded yet. Please refresh and try again.");
+      return;
+    }
+    const answeredCount = selectedAnswers.filter((value) => value >= 0).length;
+    if (answeredCount < quiz.length) {
+      setError(`Please answer all ${quiz.length} quiz questions before completing the task.`);
+      return;
+    }
+
+    setError("");
     setSaving(true);
     const total = quiz.length;
     const correct = quiz.reduce((acc, q, idx) => (selectedAnswers[idx] === q.answerIndex ? acc + 1 : acc), 0);
@@ -92,9 +103,15 @@ export default function LearnTaskPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         taskId,
-        correctCount: correct, totalCount: total,
-        hintsUsed, skippedCount, confidence, timeSpentMinutes,
-        notesMarkdown, notesSummary,
+        correctCount: correct,
+        totalCount: total,
+        answeredCount,
+        hintsUsed,
+        skippedCount,
+        confidence,
+        timeSpentMinutes,
+        notesMarkdown,
+        notesSummary,
         reflectionCanExplain: canExplain,
         reflectionBlocker: blocker,
       }),
@@ -106,7 +123,21 @@ export default function LearnTaskPage() {
     router.push("/today");
   };
 
-  if (loading) return <main className="min-h-screen bg-[#0a0a0a] text-white p-8">Loading lesson...</main>;
+  if (loading) {
+    return (
+      <main className="min-h-screen bg-[#0a0a0a] text-white flex items-center justify-center p-6">
+        <div className="w-full max-w-xl rounded-2xl border border-zinc-800 bg-zinc-900/40 backdrop-blur-sm p-8 md:p-10 text-center shadow-2xl">
+          <div className="mx-auto mb-6 h-12 w-12 rounded-full border-4 border-zinc-700 border-t-indigo-500 animate-spin" />
+          <h2 className="text-2xl md:text-3xl font-semibold tracking-tight mb-2">
+            Preparing your lesson
+          </h2>
+          <p className="text-zinc-400 text-sm md:text-base">
+            Generating notes, quiz, and personalized guidance...
+          </p>
+        </div>
+      </main>
+    );
+  }
   if (error) return <main className="min-h-screen bg-[#0a0a0a] text-red-400 p-8">{error}</main>;
 
   return (

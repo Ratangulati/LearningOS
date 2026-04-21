@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import RoadmapGraph from "@/components/RoadmapGraph";
 import StepDetailPanel from "@/components/StepDetailPanel";
+import PageLoader from "@/components/PageLoader";
 import { Pencil, Check } from "lucide-react";
 
 type Session = { id: string; subject: string; level: string; created_at: string };
@@ -95,7 +96,10 @@ export default function RoadmapPage() {
         body: JSON.stringify({ stepId: step.id }),
       });
       const data = await res.json();
-      if (data.taskId) router.push(`/learn/${data.taskId}`);
+      if (data.taskId) {
+        setSteps((prev) => prev.map((s) => (s.id === step.id ? { ...s, status: "in_progress" } : s)));
+        router.push(`/learn/${data.taskId}`);
+      }
     } catch (err) {
       console.error(err);
     }
@@ -151,7 +155,7 @@ export default function RoadmapPage() {
           </div>
         </div>
 
-        {loading && <p className="text-zinc-400">Loading roadmaps...</p>}
+        {loading && <PageLoader title="Loading roadmap" subtitle="Setting up your learning path..." />}
         {!loading && sessions.length === 0 && (
         <p className="text-zinc-500">No roadmap found. Complete onboarding to generate one.</p>
         )}
@@ -194,7 +198,7 @@ export default function RoadmapPage() {
               </div>
             )}
 
-            {stepsLoading && <p className="text-zinc-400">Loading steps...</p>}
+            {stepsLoading && <PageLoader title="Loading steps" subtitle="Arranging roadmap nodes..." compact />}
 
             {/* Edit mode */}
             {!stepsLoading && steps.length > 0 && editMode && (

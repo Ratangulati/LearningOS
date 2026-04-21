@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import GoalForm from "@/components/GoalForm";
 import TaskItem from "@/components/TaskItem";
+import PageLoader from "@/components/PageLoader";
 
 type Task = {
   id: string;
@@ -42,7 +43,7 @@ export default function GoalsPage() {
 
       <h2 className="text-2xl mb-4">Your Goals:</h2>
 
-      {loading && <p>Loading goals...</p>}
+      {loading && <PageLoader title="Loading goals" subtitle="Fetching your goals and tasks..." compact />}
       {data?.length === 0 && <p>No goals yet</p>}
 
       {data?.map((goal) => (

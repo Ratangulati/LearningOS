@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { DailyTaskRow } from "@/lib/tier1";
+import PageLoader from "@/components/PageLoader";
 
 export default function TodayPage() {
   const [tasks, setTasks] = useState<DailyTaskRow[]>([]);
@@ -75,7 +76,7 @@ export default function TodayPage() {
         </Link>
         </div>
 
-        {loading && <p className="text-zinc-400">Loading tasks...</p>}
+        {loading && <PageLoader title="Loading tasks" subtitle="Building your plan for today..." compact />}
         {!loading && message && <p className="text-yellow-300 mb-4">{message}</p>}
         {!loading && tasks.length === 0 && <p className="text-zinc-500">No tasks yet. Generate your day first.</p>}
 

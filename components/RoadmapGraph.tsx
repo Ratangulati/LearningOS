@@ -91,6 +91,7 @@ export default function RoadmapGraph({ steps, onStepClick }: Props) {
             if (!pos) return null;
             const completed = step.status === "completed";
             const bg = completed ? "#3b82f6" : "#a855f7";
+            const progress = getStepProgress(step.status);
             return (
               <g key={step.id} onClick={() => onStepClick(step)} style={{ cursor: "pointer" }}>
                 <rect
@@ -121,7 +122,17 @@ export default function RoadmapGraph({ steps, onStepClick }: Props) {
                   ry={4}
                   width={nodeWidth - 32}
                   height={7}
-                  fill="#93c5fd"
+                  fill="#ddd6fe"
+                  opacity={0.55}
+                />
+                <rect
+                  x={pos.x + 16}
+                  y={pos.y + 42}
+                  rx={4}
+                  ry={4}
+                  width={Math.max(6, ((nodeWidth - 32) * progress) / 100)}
+                  height={7}
+                  fill="#67e8f9"
                   opacity={0.95}
                 />
               </g>
@@ -136,4 +147,10 @@ export default function RoadmapGraph({ steps, onStepClick }: Props) {
 function truncate(value: string, max: number): string {
   if (value.length <= max) return value;
   return `${value.slice(0, max - 1)}…`;
+}
+
+function getStepProgress(status: string): number {
+  if (status === "completed") return 100;
+  if (status === "in_progress") return 55;
+  return 10;
 }

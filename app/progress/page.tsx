@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import StreakCalendar from "@/components/StreakCalendar";
+import PageLoader from "@/components/PageLoader";
 
 type ProgressRow = {
   id: string;
@@ -60,7 +61,7 @@ export default function ProgressPage() {
         <h1 className="page-header">Progress Dashboard</h1>
         <p className="page-subheader">Auto-tracked attempts, mastery trend, and review readiness.</p>
 
-        {loading && <p className="text-zinc-400">Loading progress...</p>}
+        {loading && <PageLoader title="Loading progress" subtitle="Crunching your latest learning stats..." compact />}
 
         {!loading && (
           <>

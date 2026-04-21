@@ -9,6 +9,7 @@ export async function POST(req: Request) {
       taskId,
       correctCount,
       totalCount,
+      answeredCount,
       hintsUsed,
       skippedCount,
       confidence,
@@ -34,6 +35,21 @@ export async function POST(req: Request) {
       return NextResponse.json({ message: "Task not found." }, { status: 404 });
     }
 
+    const total = Number(totalCount || 0);
+    const answered = Number(answeredCount || 0);
+    if (total <= 0) {
+      return NextResponse.json(
+        { message: "Quiz is missing for this task. Please reload and try again." },
+        { status: 400 }
+      );
+    }
+    if (answered < total) {
+      return NextResponse.json(
+        { message: "Please answer all quiz questions before completing the task." },
+        { status: 400 }
+      );
+    }
+
     const { data: masteryRow } = await supabaseServer
       .from("topic_mastery")
       .select("id,mastery_score,next_review_date")
@@ -45,7 +61,7 @@ export async function POST(req: Request) {
     const updatedMastery = updateMasteryScore({
       current: currentMastery,
       correct: Number(correctCount || 0),
-      total: Number(totalCount || 0),
+      total,
       hintsUsed: Number(hintsUsed || 0),
       skippedCount: Number(skippedCount || 0),
       timeSpentMinutes: Number(timeSpentMinutes || 0),
@@ -64,7 +80,7 @@ export async function POST(req: Request) {
         started_at: new Date(Date.now() - Number(timeSpentMinutes || 0) * 60000).toISOString(),
         ended_at: new Date().toISOString(),
         correct_count: Number(correctCount || 0),
-        total_count: Number(totalCount || 0),
+        total_count: total,
         hints_used: Number(hintsUsed || 0),
         skipped_count: Number(skippedCount || 0),
         confidence: Number(confidence || 3),
@@ -121,7 +137,8 @@ export async function POST(req: Request) {
         task_id: taskId,
         metadata: {
           correctCount: Number(correctCount || 0),
-          totalCount: Number(totalCount || 0),
+          totalCount: total,
+          answeredCount: answered,
           hintsUsed: Number(hintsUsed || 0),
           skippedCount: Number(skippedCount || 0),
           confidence: Number(confidence || 3),
