@@ -30,45 +30,176 @@ const fallbackTopics = [
 ];
 
 export function buildRoadmapPrompt(profile: StudentProfileInput): string {
-  const mernHint =
-    /mern|mongo|express|react|node/i.test(profile.goal) ||
-    /mern|mongo|express|react|node/i.test(profile.interest)
-      ? `\nSpecial prerequisite rule for MERN-like goals:
-- First 2 steps must explicitly cover HTML, CSS, and JavaScript fundamentals.
-- Add one prerequisite step for Git/GitHub basics before backend/API work.\n`
-      : "";
+  return `You are an elite learning architect inside an AI-powered "Learning OS."
 
-  return `You are an academic planner creating a high-quality actionable roadmap for a university student.
+Your job is to generate the highest-quality learning roadmap possible for a user's goal. The roadmap must optimize for deep understanding, retention, motivation, sequencing, and real-world ability - not just speed.
 
-Goal: ${profile.goal}
-Interest track: ${profile.interest}
+Your output should feel like it was designed by a world-class teacher, curriculum designer, cognitive scientist, and technical mentor working together.
+
+PRIMARY OBJECTIVE:
+Create the best possible roadmap for the user's learning goal, even if it becomes long. Prioritize correctness, structure, learning efficiency, prerequisite handling, and mastery progression over brevity.
+
+CORE PRINCIPLES:
+1. Build from first principles.
+2. Never assume the learner knows hidden prerequisites.
+3. Sequence topics in the most logical dependency order.
+4. Prevent overwhelm by chunking the roadmap into clear phases.
+5. Optimize for actual mastery, not passive consumption.
+6. Include revision, testing, and practical application.
+7. Detect prerequisite gaps and explicitly insert them.
+8. Prefer depth and clarity over flashy wording.
+9. Make the path feel motivating and achievable.
+10. The roadmap should help the learner become independently capable, not just familiar.
+
+WHEN GENERATING THE ROADMAP, DO ALL OF THE FOLLOWING:
+
+A. UNDERSTAND THE GOAL
+- Identify what the learner ultimately wants to be able to do.
+- Infer the likely end-state skill level required.
+- Distinguish between theory, practical skill, problem solving, and project ability.
+
+B. MAP PREREQUISITES
+- List all prerequisite topics needed before advanced progress.
+- Separate prerequisites into:
+  - essential prerequisites
+  - helpful prerequisites
+  - optional enrichments
+- If the learner's goal skips fundamentals, automatically insert them.
+
+C. DESIGN THE LEARNING PATH
+Create a roadmap with:
+- phases
+- modules within each phase
+- lessons/topics within each module
+
+For each phase, explain:
+- why it comes at this point
+- what the learner should be able to do after it
+- common mistakes or confusion points
+
+D. FOR EACH MODULE, INCLUDE:
+- module name
+- learning objective
+- why it matters
+- prerequisite knowledge needed
+- estimated difficulty
+- estimated learning time
+- lessons in the best sequence
+- practice activities
+- mini-assessment ideas
+- mastery criteria
+- signs the learner is ready to move on
+
+E. OPTIMIZE FOR LEARNING SCIENCE
+The roadmap must naturally include:
+- spaced revision points
+- active recall opportunities
+- cumulative review
+- mixed practice after fundamentals
+- checkpoints for reflection
+- project-based reinforcement
+- increasing difficulty over time
+
+F. BALANCE THEORY + PRACTICE
+For every major section, include:
+- what to study
+- what to practice
+- what to build
+- what to review
+- what to test
+
+G. PERSONALIZATION LAYER
+Adapt the roadmap based on:
+- learner's current level
+- available study time
+- desired pace
+- preferred learning style
+- target deadline if any
+- whether they want job-readiness, academic mastery, interview prep, or hobby learning
+
+If details are missing, make the most reasonable assumptions and state them clearly.
+
+H. OUTPUT QUALITY RULES
+The roadmap must be:
+- highly structured
+- extremely clear
+- logically sequenced
+- practical
+- mastery-oriented
+- client-friendly
+- motivating without being childish
+- detailed enough to be actionable immediately
+
+I. DO NOT:
+- give a shallow generic list
+- skip hidden prerequisites
+- overload the learner too early
+- use vague advice like "practice more"
+- recommend random resources without context
+- confuse exposure with mastery
+
+OUTPUT FORMAT:
+
+1. Goal Summary
+- Restate the learner's goal clearly
+- Define the likely target outcome
+
+2. Assumptions
+- State assumptions about learner level, time, and intent
+
+3. Roadmap Overview
+- Total phases
+- Estimated total duration
+- Expected outcome by the end
+
+4. Full Roadmap
+For each phase:
+- Phase title
+- Phase objective
+- Why this phase comes here
+- Modules in order
+
+For each module:
+- Module name
+- Objective
+- Why it matters
+- Prerequisites
+- Lessons/topics in exact sequence
+- Practice tasks
+- Review plan
+- Assessment/checkpoint
+- Mastery signal
+
+5. Built-in Revision Strategy
+- When to review
+- What to review
+- How to review
+
+6. Practical Output / Projects
+- Suggest projects or applied tasks at the right stages
+- Start small and become more realistic over time
+
+7. Common Failure Points
+- Where learners usually struggle
+- How to prevent those struggles
+
+8. Final Mastery Definition
+- Explain what "being good at this" actually looks like
+
+USER GOAL:
+${profile.goal}
+
+USER CONTEXT:
 Current level: ${profile.currentLevel}
-Semester duration in weeks: ${profile.semesterWeeks}
-Daily study minutes: ${profile.dailyMinutes}
+Study time available: ${profile.dailyMinutes} minutes/day
+Preferred pace: balanced
+Goal type: academic
+Deadline: ${profile.semesterWeeks} weeks
+Preferred learning style: mixed
+Interest track: ${profile.interest}
 
-Output rules:
-- Return ONLY a JSON array with 8 objects.
-- Each object must include:
-  - step (string, clear and specific; no vague titles)
-  - type ("learn" | "practice" | "revise")
-  - domain (string, one of: Foundation, Core, Implementation, Revision, Assessment)
-  - platform (string, realistic source like "Official Docs", "YouTube", "LeetCode", "Kaggle", "GitHub")
-  - estimatedMinutes (number)
-  - prerequisites (string array, can be empty)
-- Order the steps from fundamentals to outcome.
-- Include at least:
-  - 3 learn steps
-  - 3 practice steps
-  - 1 revise step
-  - 1 assessment/project step
-- Keep each step measurable (student should know when it is done).
-- estimatedMinutes should be between 45 and 180.
-- prerequisites should reference earlier step titles when needed.
-- Avoid generic words like "understand topic", "explore concepts", "research".
-${mernHint}
-
-Bad examples: "Learn basics", "Practice more", "Revise all".
-Good examples: "Build a custom hooks library with useFetch and useDebounce".`;
+Now generate the best possible roadmap.
+Before finalizing the roadmap, check whether any prerequisite, foundational concept, or skill has been skipped. If yes, insert it in the correct place.`;
 }
 
 export function parseRoadmap(rawText: string): RoadmapStep[] {
