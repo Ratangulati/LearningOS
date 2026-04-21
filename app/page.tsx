@@ -5,7 +5,7 @@ import SplineRobot from "@/components/SplineRobot";
 import { useSession, signIn } from "next-auth/react";
 
 export default function Home() {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
 
   return (
     <main className="relative min-h-screen bg-[#0a0a0a] text-white overflow-hidden">
@@ -24,11 +24,11 @@ export default function Home() {
           </p>
 
           <div className="flex flex-wrap gap-3 mb-8">
-            {!session ? (
+            {status === "unauthenticated" ? (
               <button onClick={() => signIn("google")} className="btn-primary">
                 Sign in to start <ArrowRight size={16} />
               </button>
-            ) : (
+            ) : status === "authenticated" ? (
               <>
                 <button
                   onClick={() => (window.location.href = "/onboarding")}
@@ -49,7 +49,7 @@ export default function Home() {
                   View Progress
                 </button>
               </>
-            )}
+            ) : null}
           </div>
 
           <div className="flex flex-wrap gap-2">
