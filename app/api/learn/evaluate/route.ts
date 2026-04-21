@@ -72,6 +72,13 @@ export async function POST(req: Request) {
       masteryRow ? { mastery_score: currentMastery, next_review_date: masteryRow.next_review_date } : null,
       updatedMastery
     );
+    const behaviorImpact = {
+      hintsUsed: Number(hintsUsed || 0),
+      skippedCount: Number(skippedCount || 0),
+      timeSpentMinutes: Number(timeSpentMinutes || 0),
+      estimatedMinutes: Number(task.estimated_minutes || 30),
+      confidence: Number(confidence || 3),
+    };
 
     await supabaseServer.from("learning_attempts").insert([
       {
@@ -116,35 +123,44 @@ export async function POST(req: Request) {
       },
     ]);
 
-    // Best-effort reflection persistence.
-    await supabaseServer.from("learning_reflections").insert([
-      {
-        user_id: userId,
-        task_id: taskId,
-        topic: task.topic,
-        confidence: Number(confidence || 3),
-        can_explain: Boolean(reflectionCanExplain),
-        blocker_text: reflectionBlocker || null,
-      },
-    ]);
-
-    // Best-effort event logging.
-    await supabaseServer.from("learning_events").insert([
-      {
-        user_id: userId,
-        event_type: "task_completed",
-        topic: task.topic,
-        task_id: taskId,
-        metadata: {
-          correctCount: Number(correctCount || 0),
-          totalCount: total,
-          answeredCount: answered,
-          hintsUsed: Number(hintsUsed || 0),
-          skippedCount: Number(skippedCount || 0),
+    // Best-effort reflection + adaptation events.
+    await Promise.allSettled([
+      supabaseServer.from("learning_reflections").insert([
+        {
+          user_id: userId,
+          task_id: taskId,
+          topic: task.topic,
           confidence: Number(confidence || 3),
-          timeSpentMinutes: Number(timeSpentMinutes || 0),
+          can_explain: Boolean(reflectionCanExplain),
+          blocker_text: reflectionBlocker || null,
         },
-      },
+      ]),
+      supabaseServer.from("learning_events").insert([
+        {
+          user_id: userId,
+          event_type: "task_completed",
+          topic: task.topic,
+          task_id: taskId,
+          metadata: {
+            correctCount: Number(correctCount || 0),
+            totalCount: total,
+            answeredCount: answered,
+            ...behaviorImpact,
+          },
+        },
+        {
+          user_id: userId,
+          event_type: "behavior_profile_updated",
+          topic: task.topic,
+          task_id: taskId,
+          metadata: {
+            masteryBefore: currentMastery,
+            masteryAfter: updatedMastery,
+            nextReviewDate: reviewDate,
+            ...behaviorImpact,
+          },
+        },
+      ]),
     ]);
 
     await supabaseServer.from("learning_tasks").update({ status: "completed" }).eq("id", taskId);

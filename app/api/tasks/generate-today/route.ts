@@ -83,6 +83,45 @@ export async function POST(req: Request) {
       (masteryRows || []).map((row) => [String(row.topic).toLowerCase(), row])
     );
 
+    const yesterdayStart = new Date();
+    yesterdayStart.setDate(yesterdayStart.getDate() - 1);
+    yesterdayStart.setHours(0, 0, 0, 0);
+    const yesterdayEnd = new Date(yesterdayStart);
+    yesterdayEnd.setHours(23, 59, 59, 999);
+
+    const { data: yesterdayAttempts } = await supabaseServer
+      .from("learning_attempts")
+      .select("task_id,correct_count,total_count,hints_used,skipped_count,time_spent_minutes")
+      .eq("user_id", userId)
+      .gte("created_at", yesterdayStart.toISOString())
+      .lte("created_at", yesterdayEnd.toISOString());
+
+    const yesterdayTaskIds = (yesterdayAttempts || []).map((a) => a.task_id);
+    const { data: yesterdayTasks } = await supabaseServer
+      .from("learning_tasks")
+      .select("id,topic,estimated_minutes")
+      .in("id", yesterdayTaskIds.length > 0 ? yesterdayTaskIds : [""]);
+
+    const yesterdayTaskMap = new Map((yesterdayTasks || []).map((t) => [t.id, t]));
+    const yesterdayPerformanceByTopic = new Map<string, number>();
+    for (const attempt of yesterdayAttempts || []) {
+      const task = yesterdayTaskMap.get(attempt.task_id);
+      if (!task?.topic) continue;
+      const topicKey = String(task.topic).toLowerCase();
+      const total = Number(attempt.total_count || 0);
+      const accuracy = total > 0 ? Number(attempt.correct_count || 0) / total : 0;
+      const hintsPenalty = Math.min(0.2, Number(attempt.hints_used || 0) * 0.04);
+      const skipPenalty = Math.min(0.25, Number(attempt.skipped_count || 0) * 0.08);
+      const overtime =
+        Number(task.estimated_minutes || 30) > 0 &&
+        Number(attempt.time_spent_minutes || 0) > Number(task.estimated_minutes || 30) * 1.3
+          ? 0.05
+          : 0;
+      const performance = Math.max(0, Math.min(1, accuracy - hintsPenalty - skipPenalty - overtime));
+      const prev = yesterdayPerformanceByTopic.get(topicKey);
+      yesterdayPerformanceByTopic.set(topicKey, prev === undefined ? performance : (prev + performance) / 2);
+    }
+
     const firstPendingIndex = steps.findIndex((step) => step.status === "not_started");
     const nextSteps = steps.slice(Math.max(0, firstPendingIndex), Math.max(0, firstPendingIndex) + 4);
     const candidates = nextSteps.length > 0 ? nextSteps : steps.slice(0, 4);
@@ -98,6 +137,12 @@ export async function POST(req: Request) {
         reviewDue,
         weaknessScore: weakness,
       });
+      const yesterdayPerformance = yesterdayPerformanceByTopic.get(step.step.toLowerCase());
+      const yesterdayWeakness =
+        yesterdayPerformance === undefined ? 0 : Number((1 - yesterdayPerformance).toFixed(3));
+      const adjustedScore = Number(
+        Math.min(1, score + yesterdayWeakness * 0.2 + (reviewDue ? 0.05 : 0)).toFixed(3)
+      );
       const inferredType = reviewDue ? "revise" : step.type || "learn";
 
       return {
@@ -106,7 +151,7 @@ export async function POST(req: Request) {
         topic: step.step,
         task_type: inferredType as "learn" | "practice" | "revise",
         status: "pending",
-        priority_score: score,
+        priority_score: adjustedScore,
         estimated_minutes: inferredType === "learn" ? 40 : 25,
         due_date: today,
       };
@@ -133,12 +178,32 @@ export async function POST(req: Request) {
 
     const uniqueRows = [...prerequisiteRows, ...taskRows]
       .filter((row, index, arr) => arr.findIndex((x) => x.topic === row.topic) === index)
-      .sort((a, b) => b.priority_score - a.priority_score)
-      .slice(0, 5);
+      .sort((a, b) => b.priority_score - a.priority_score);
+
+    // Guarantee a practical daily plan of at least 3 tasks when roadmap has capacity.
+    if (uniqueRows.length < 3) {
+      const existingStepIds = new Set(uniqueRows.map((row) => row.roadmap_step_id));
+      const fallbackRows = steps
+        .filter((step) => !existingStepIds.has(step.id))
+        .slice(0, 3 - uniqueRows.length)
+        .map((step, idx) => ({
+          user_id: userId,
+          roadmap_step_id: step.id,
+          topic: step.step,
+          task_type: (step.type || "learn") as "learn" | "practice" | "revise",
+          status: "pending" as const,
+          priority_score: Number((0.55 - idx * 0.02).toFixed(3)),
+          estimated_minutes: step.type === "learn" ? 40 : 25,
+          due_date: today,
+        }));
+      uniqueRows.push(...fallbackRows);
+    }
+
+    const finalRows = uniqueRows.slice(0, 5);
 
     const { data: inserted, error: insertError } = await supabaseServer
       .from("learning_tasks")
-      .insert(uniqueRows)
+      .insert(finalRows)
       .select("*");
 
     if (insertError) {

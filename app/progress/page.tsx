@@ -16,6 +16,7 @@ type ProgressRow = {
   skipped: number;
   masteryBefore: number;
   masteryAfter: number;
+  masteryGained: number;
 };
 
 type MasteryRow = {
@@ -138,6 +139,7 @@ export default function ProgressPage() {
                       <th className="text-left p-2">Hints</th>
                       <th className="text-left p-2">Skips</th>
                       <th className="text-left p-2">Mastery</th>
+                      <th className="text-left p-2">Delta</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -154,6 +156,10 @@ export default function ProgressPage() {
                         <td className="p-2">{row.skipped}</td>
                         <td className="p-2">
                           {row.masteryBefore} -&gt; {row.masteryAfter}
+                        </td>
+                        <td className={`p-2 ${row.masteryGained >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                          {row.masteryGained >= 0 ? "+" : ""}
+                          {row.masteryGained}
                         </td>
                       </tr>
                     ))}

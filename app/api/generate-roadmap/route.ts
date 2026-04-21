@@ -101,13 +101,22 @@ export async function POST(req: Request) {
         type: s.type,
         domain: s.domain,
         platform: s.platform,
+        estimated_minutes: Number(s.estimatedMinutes || 45),
+        prerequisites: s.prerequisites || [],
         difficulty: currentLevel,
         status: "not_started",
         order_index: i,
         session_id: session?.id,
       }));
 
-      if (rows.length > 0) await supabaseServer.from("roadmap").insert(rows);
+      if (rows.length > 0) {
+        const { error: insertError } = await supabaseServer.from("roadmap").insert(rows);
+        // Backward-compatible fallback for schemas that don't yet store roadmap metadata.
+        if (insertError) {
+          const baseRows = rows.map(({ estimated_minutes, prerequisites, ...rest }) => rest);
+          await supabaseServer.from("roadmap").insert(baseRows);
+        }
+      }
 
       allRoadmaps.push({ subject, roadmap });
     }

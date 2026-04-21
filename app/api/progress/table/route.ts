@@ -43,6 +43,9 @@ export async function GET(req: Request) {
         skipped: attempt.skipped_count,
         masteryBefore: attempt.mastery_before,
         masteryAfter: attempt.mastery_after,
+        masteryGained: Number(
+          (Number(attempt.mastery_after || 0) - Number(attempt.mastery_before || 0)).toFixed(3)
+        ),
       };
     });
 
