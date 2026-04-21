@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import RoadmapGraph from "@/components/RoadmapGraph";
+import ResourcePanel from "@/components/ResourcePanel";
 import { Pencil, Check, Play } from "lucide-react";
 
 type Session = { id: string; subject: string; level: string; created_at: string };
@@ -19,6 +20,7 @@ export default function RoadmapPage() {
   const [editedTitles, setEditedTitles] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [startingId, setStartingId] = useState<string | null>(null);
+  const [panelStep, setPanelStep] = useState<any | null>(null);
 
   useEffect(() => {
     const fetchSessions = async () => {
@@ -194,7 +196,7 @@ export default function RoadmapPage() {
                   {steps.map((step, idx) => (
                     <div key={step.id} className="card flex items-center gap-4 py-3">
                       <span className="text-zinc-500 text-sm w-6 shrink-0">{idx + 1}</span>
-                      <span className="flex-1 text-sm">{step.step}</span>
+                      <button onClick={() => setPanelStep(step)} className="flex-1 text-sm text-left hover:text-indigo-300 transition">{step.step}</button>
                       <span className={`badge shrink-0 text-xs ${step.status === "completed" ? "border-emerald-700 text-emerald-400" : "border-zinc-700 text-zinc-500"}`}>
                         {step.status}
                       </span>
@@ -213,6 +215,7 @@ export default function RoadmapPage() {
           </>
         )}
       </div>
+      {panelStep && <ResourcePanel step={panelStep} onClose={() => setPanelStep(null)} />}
     </main>
   );
 }
